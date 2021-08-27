@@ -34,10 +34,9 @@ const userValidator = Joi.object().keys({
 });
 
 const ocenaValidator = Joi.object().keys({
-    Ocena: Joi.number().integer().min(1).max(10).required(),
+    Ocena: Joi.number().min(1).max(10).required(),
     Komentar: Joi.string().trim().required(),
-    Ocena: Joi.number().integer().required()
-
+    idFilma: Joi.number()
 });
 
 // Middleware da parsira json request-ove
@@ -68,7 +67,7 @@ route.post('/filmovi', (req, res) => {
                     if (err)
                         res.status(500).send(err.sqlMessage);
                     else
-                        res.send(rows[0]);
+                        res.status(200).send(rows[0]);
                 });
             }
         });
@@ -80,8 +79,9 @@ route.post('/oceni/:idFilma', (req, res) => {
     let { error } = Joi.validate(req.body, ocenaValidator);  // Object decomposition - dohvatamo samo gresku
 
     // Ako su podaci neispravni prijavimo gresku
-    if (error)
+    if (error){
         res.status(400).send(error.details[0].message);  // Greska zahteva
+    }
     else {  // Ako nisu upisemo ih u bazu
         // Izgradimo SQL query string
         let query = "insert into ocenakomentar (Ocena, Komentar, idFilma) values (?, ?, ?)";
@@ -166,8 +166,7 @@ route.post('/register', (req, res)=>{
                }else{
                    let query = "insert into Korisnici (Username, Password) values (?, ?)";
 
-                   var ciphertext = CryptoJS.AES.encrypt(req.body.Password, 'secret key 123').toString();
-                   console.log(ciphertext);
+                   var ciphertext =  CryptoJS.SHA256(req.body.Password).toString();
 
                    let formated = mysql.format(query, [req.body.Username, ciphertext]);
 
@@ -176,7 +175,7 @@ route.post('/register', (req, res)=>{
                        if (err)
                            res.status(500).send(err.sqlMessage);
                         else{
-                            res.send(200);
+                            res.status(200).send("OK");
                        }
                    });
                }
@@ -194,9 +193,9 @@ route.post('/login', (req, res)=>{
     if (error)
         res.status(400).send(error.details[0].message);  // Greska zahteva
     else {
-        var ciphertext = CryptoJS.AES.encrypt(req.body.Password, 'secret key 123').toString();
+        var ciphertext = CryptoJS.SHA256(req.body.Password).toString();
 
-        let formated = mysql.format('select * from korisnici where Username = ? and Password =?', [req.body.Username, req.body.Password]);
+        let formated = mysql.format('select * from korisnici where Username = ? and Password =?', [req.body.Username, ciphertext]);
         pool.query(formated, (err, rows) =>{
             if (err){
                 res.status(400).send(err.sqlMessage);
@@ -205,13 +204,37 @@ route.post('/login', (req, res)=>{
                     res.status(400).send("Pogresno korisnicko ime ili lozinka");
                 }else{
 
-                    res.status(200);
+                    res.status(200).send("OK");
 
                 }
             }
         });
 
     }
+});
+
+// Brisanje poruke (vraca korisniku ceo red iz baze)
+route.delete('/film/:id', (req, res) => {
+    let query = 'select * from filmovi where id=?';
+    let formated = mysql.format(query, [req.params.id]);
+
+    pool.query(formated, (err, rows) => {
+        if (err)
+            res.status(500).send(err.sqlMessage);
+        else {
+            let poruka = rows[0];
+
+            let query = 'delete from filmovi where id=?';
+            let formated = mysql.format(query, [req.params.id]);
+
+            pool.query(formated, (err, rows) => {
+                if (err)
+                    res.status(500).send(err.sqlMessage);
+                else
+                    res.status(200).send(poruka);
+            });
+        }
+    });
 });
 
 module.exports = route;
