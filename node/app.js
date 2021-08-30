@@ -2,13 +2,14 @@ const express = require('express');
 const flms = require('./routes/filmovi');  // Nas ruter (REST API)
 const history = require('connect-history-api-fallback');
 const path = require('path');
-
 const app = express();
+require("dotenv").config();
+
 
 app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    res.header("Access-Control-Allow-Headers", "Origin,Authorization, X-access-token, X-Requested-With, Content-Type, Accept");
     next();
 });
 

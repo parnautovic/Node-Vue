@@ -3,7 +3,20 @@ const Joi = require('joi');
 const mysql = require('mysql');
 const {response} = require("express");
 var CryptoJS = require("crypto-js");
+//const auth = require("../middleware/auth");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
+const cookieParser = require("cookie-parser");
 
+function setCookie(name,value,days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+}
 // Koristimo pool da bi automatski aquire-ovao i release-ovao konekcije
 const pool = mysql.createPool({
     connectionLimit: 100,
@@ -12,6 +25,8 @@ const pool = mysql.createPool({
     password: '',
     database: 'filmovi'
 });
+
+
 
 // Instanciramo ruter
 const route = express.Router();
@@ -41,8 +56,28 @@ const ocenaValidator = Joi.object().keys({
 
 // Middleware da parsira json request-ove
 route.use(express.json());
+route.use(cookieParser());
 
-route.post('/filmovi', (req, res) => {
+const auth = (req, res, next) => {
+    let token = req.headers["x-access-token"];
+
+    if (!token) {
+        return res.status(403).send({
+            message: "No token provided!"
+        });
+    }
+
+    jwt.verify(token, "123", (err, decoded) => {
+        if (err) {
+            return res.status(403).send({
+                message: "Unauthorized!"
+            });
+        }
+        next();
+    });
+};
+
+route.post('/filmovi', auth,(req, res) => {
     // Validiramo podatke koje smo dobili od korisnika
     let { error } = Joi.validate(req.body, filmValidator);  // Object decomposition - dohvatamo samo gresku
 
@@ -110,7 +145,7 @@ route.post('/oceni/:idFilma', (req, res) => {
 
 
 // Prikaz svih filmova
-route.get('/filmovi', (req, res) => {
+route.get('/filmovi',  auth,(req, res) => {
     // Saljemo upit bazi
     pool.query('select * from filmovi', (err, rows) => {
         if (err)
@@ -147,7 +182,33 @@ route.get('/ocene/:idFilma', (req, res) => {
             res.send(rows);
     });
 });
+route.put('/film/:id', auth,(req, res) => {
+    let { error } = Joi.validate(req.body, filmValidator);
 
+    if (error)
+        res.status(400).send(error.details[0].message);
+    else {
+        let query = "update filmovi set Naziv=?, Godina=?, Zanr=? where id=?";
+        let formated = mysql.format(query, [req.body.Naziv, req.body.Godina, req.body.Zanr, req.params.id]);
+
+        pool.query(formated, (err, response) => {
+            if (err)
+                res.status(500).send(err.sqlMessage);
+            else {
+                query = 'select * from filmovi where id=?';
+                formated = mysql.format(query, [req.params.id]);
+
+                pool.query(formated, (err, rows) => {
+                    if (err)
+                        res.status(500).send(err.sqlMessage);
+                    else
+                        res.status(200).send(rows[0]);
+                });
+            }
+        });
+    }
+
+});
 route.post('/register', (req, res)=>{
     // Validiramo podatke koje smo dobili od korisnika
     let { error } = Joi.validate(req.body, userValidator);  // Object decomposition - dohvatamo samo gresku
@@ -164,6 +225,10 @@ route.post('/register', (req, res)=>{
                if (rows.length > 0){
                    res.status(400).send("Vec postoji takav username");
                }else{
+                   // Create token
+                   console.log(req.body.Username);
+                   const token = jwt.sign({ user_id: req.body.Username }, "YOUR_SECRET_KEY");
+
                    let query = "insert into Korisnici (Username, Password) values (?, ?)";
 
                    var ciphertext =  CryptoJS.SHA256(req.body.Password).toString();
@@ -175,7 +240,8 @@ route.post('/register', (req, res)=>{
                        if (err)
                            res.status(500).send(err.sqlMessage);
                         else{
-                            res.status(200).send("OK");
+
+                           res.status(200).send({token: token});
                        }
                    });
                }
@@ -203,8 +269,35 @@ route.post('/login', (req, res)=>{
                 if (rows.length == 0){
                     res.status(400).send("Pogresno korisnicko ime ili lozinka");
                 }else{
+                    var token = jwt.sign({ id: req.body.Username}, "123", {
+                        expiresIn: 86400 // 24 hours
+                    });
+                    // let formated = mysql.format('update korisnici set token=? where Username=?', [token, req.body.Username] )
+                    res.status(200).send({token: token});
+                    // pool.query(formated, (err, rows) => {
+                    //     if (err) {
+                    //         res.status(400).send(err.sqlMessage);
+                    //     } else {
+                    //
+                          //  setCookie("access_token", token, 7);
+                         //   res.status(200).send(token);
+                         //    res
+                         //        .cookie("access_token", token, {
+                         //            httpOnly: true,
+                         //            secure: process.env.NODE_ENV === "production",
+                         //        })
+                         //        .status(200)
+                         //        .json({ token: "Logged in successfully 😊 👌 token: " + token });
+                            // let oneDay =24*60*60;
+                            // res.cookie('access_token', token, {
+                            //     oneDay,
+                            //     httpOnly: true,
+                            //     // Forces to use https in production
+                            //     secure: process.env.NODE_ENV === 'production'? true: false
+                            //     }).status(200).send("ULOGOVAN");
+                        // }
+                    // });
 
-                    res.status(200).send("OK");
 
                 }
             }
@@ -224,15 +317,28 @@ route.delete('/film/:id', (req, res) => {
         else {
             let poruka = rows[0];
 
-            let query = 'delete from filmovi where id=?';
+            let query = 'delete from ocenakomentar where idFilma=?';
             let formated = mysql.format(query, [req.params.id]);
 
             pool.query(formated, (err, rows) => {
                 if (err)
                     res.status(500).send(err.sqlMessage);
-                else
-                    res.status(200).send(poruka);
+                else{
+                    query = 'delete from filmovi where id=?';
+                    formated = mysql.format(query, [req.params.id]);
+                    pool.query(formated, (err, rows)=>{
+                       if (err){
+                           res.status(500).send(err.sqlMessage);
+                       } else{
+                           res.status(200).send("Uspesno brisanje");
+                       }
+                    });
+                }
             });
+
+
+
+
         }
     });
 });

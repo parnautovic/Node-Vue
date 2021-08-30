@@ -4,6 +4,8 @@ import Home from '../views/Home.vue'
 import Film from "@/views/Film";
 import NewFilm from "@/views/NewFilm";
 import OceniFilm from "@/views/OceniFilm";
+import EditFilm from "@/views/EditFilm";
+import LoginRegister from "@/views/LoginRegister";
 
 Vue.use(VueRouter)
 
@@ -14,9 +16,19 @@ const routes = [
     component: Home
   },
   {
-    path: '/edit',
+    path: '/new',
     name: 'newFilm',
     component: NewFilm
+  },
+  {
+    path:'/loginRegister',
+    name: 'loginRegister',
+    component: LoginRegister
+  },
+  {
+    path:'/edit/:id',
+    name:'editFilm',
+    component: EditFilm
   },
   {
     path: '/film/:id',

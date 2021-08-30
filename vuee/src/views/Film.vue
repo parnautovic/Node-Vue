@@ -17,6 +17,7 @@
 <script>
 import Header from "@/components/Header";
 import {mapState} from "vuex";
+import router from "@/router";
 
 export default {
   name: "Film",
@@ -31,9 +32,15 @@ export default {
     ...mapState(['filmovi']),
   },
   mounted: function (){
-    fetch(`http://localhost:80/api/ocene/${this.$route.params.id}`,  { method: 'get' }).then((response) => {
-      if (!response.ok)
-        throw response;
+    fetch(`http://localhost:80/api/ocene/${this.$route.params.id}`,  { method: 'get'}).then((response) => {
+      if (!response.ok){
+        if(response.status == 403){
+          router.push({path: '/loginRegister'})
+          return;
+        }else{
+          throw response;
+        }
+      }
       return response.json();
     }).then((jsonData) => {
       this.kritike = jsonData;
