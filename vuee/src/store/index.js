@@ -52,7 +52,7 @@ export default new Vuex.Store({
       fetch('http://localhost:80/api/filmovi', {method: 'get', headers:{'x-access-token':token}}).then((response) => {
         if (!response.ok){
           if(response.status == 403){
-            router.push({path: '/loginRegister'})
+            router.push({path: '/loginRegister'}).catch(()=>{})
             return;
           }else{
             throw response;
@@ -81,7 +81,7 @@ export default new Vuex.Store({
       }).then((response) => {
         if (!response.ok) {
           if (response.status == 403) {
-            router.push({path: '/loginRegister'})
+            router.push({path: '/loginRegister'}).catch(()=>{})
             return;
           }
           throw  response;
@@ -110,7 +110,7 @@ export default new Vuex.Store({
       }).then((response) => {
         if (!response.ok) {
           if (response.status == 403) {
-            router.push({path: '/loginRegister'})
+            router.push({path: '/loginRegister'}).catch(()=>{})
             return;
           }
         }
@@ -139,7 +139,7 @@ export default new Vuex.Store({
       }).then((response) => {
         if (!response.ok) {
           if (response.status == 403) {
-            router.push({path: '/loginRegister'})
+            router.push({path: '/loginRegister'}).catch(()=>{})
             return;
           }
           throw  response;
@@ -191,7 +191,7 @@ export default new Vuex.Store({
         return response.json();
       }).then((jsonData)=>{
         localStorage.setItem('access_token', jsonData.token);
-        router.push({path: '/'});
+        router.push({path: '/'}).catch(()=>{});
       }).catch((error) => {
         if (typeof error.text === 'function')
           error.text().then((errorMessage) => {

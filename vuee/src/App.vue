@@ -3,17 +3,23 @@
     <div id="nav">
       <router-link to="/">Home</router-link> |
       <router-link to="/new">New film</router-link>
+      <b-button type="button" @click="logout" variant="primary">Logout</b-button>
     </div>
     <router-view/>
   </div>
 </template>
 <script>
   import { mapActions } from 'vuex';
+  import router from "@/router";
 
   export default {
     name: "App",
     methods: {
-      ...mapActions(['load_filmovi'])
+      ...mapActions(['load_filmovi']),
+      logout(){
+        localStorage.removeItem('access_token');
+        router.push({path: '/loginRegister'}).catch(()=>{})
+      }
     },
     mounted: function() {
       this.load_filmovi();
